@@ -1,4 +1,4 @@
-###Drug-target binding affinity prediction model based on multi-scale diffusion and interactive learning
+### Drug-target binding affinity prediction model based on multi-scale diffusion and interactive learning
 
 -----------
 
