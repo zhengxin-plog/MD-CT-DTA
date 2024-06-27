@@ -1,0 +1,1 @@
+You can access the bindingDB dataset at the given URL : https://www.bindingdb.org/rwd/bind/index.jsp.
