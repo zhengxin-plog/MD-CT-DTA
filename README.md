@@ -1,4 +1,4 @@
-###Drug-target binding affinity prediction model based on multi-scale diffusion and interactive learning
+#### Drug-target binding affinity prediction model based on multi-scale diffusion and interactive learning
 
 -----------
 
@@ -15,3 +15,16 @@ The datasets used in this paper are KIBA，Davis, Metz and BindingDB. The way to
 -------------------
 
 The other libraries are listed in the requirements file.
+
+#### Cite
+
+-------------------
+
+@article{zhu2024drug,
+  title={Drug-target binding affinity prediction model based on multi-scale diffusion and interactive learning},
+  author={Zhu, Zhiqin and Zheng, Xin and Qi, Guanqiu and Gong, Yifei and Li, Yuanyuan and Mazur, Neal and Cong, Baisen and Gao, Xinbo},
+  journal={Expert Systems with Applications},
+  pages={124647},
+  year={2024},
+  publisher={Elsevier}
+}
