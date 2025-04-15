@@ -12,7 +12,7 @@ import argparse
 
 from metrics import get_cindex
 from dataset import *
-from ML_DTI import MGraphDTA
+from model import MGraphDTA
 from utils import *
 from log.train_logger import TrainLogger
 
