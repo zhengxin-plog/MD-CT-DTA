@@ -12,7 +12,7 @@ import argparse
 
 from metrics import get_cindex
 from dataset import *
-from model import MGraphDTA
+from model import MDCTDTA
 from utils import *
 from log.train_logger import TrainLogger
 
@@ -75,7 +75,7 @@ def main():
 
     device = torch.device('cuda:2')
     # device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    model = MGraphDTA(3, 25 + 1, embedding_size=128, filter_num=32, out_dim=1).to(device)
+    model = MDCTDTA(3, 25 + 1, embedding_size=128, filter_num=32, out_dim=1).to(device)
 
     # epochs = 3000
     epochs = 6000;
