@@ -13,7 +13,7 @@ import seaborn as sns
 from metrics import get_cindex, get_rm2
 from dataset import *
 
-from ML_DTI import MGraphDTA
+from model import MDCTDTA
 from utils import *
 
 dirname = os.path.dirname(PySide2.__file__)
@@ -71,7 +71,7 @@ def main():
     test_loader = DataLoader(test_set, batch_size=256, shuffle=False, num_workers=8)
 
     device = torch.device('cuda:2')
-    model = MGraphDTA(3, 25 + 1, embedding_size=128, filter_num=32, out_dim=1).to(device)
+    model = MDCTDTA(3, 25 + 1, embedding_size=128, filter_num=32, out_dim=1).to(device)
 
     criterion = nn.MSELoss()
     load_model_dict(model, model_path)
