@@ -1,2 +1,2 @@
 This folder gives the reference files for the main model.
-model.py has been temporarily deleted because the version is incorrect. The correct version will be uploaded soon.
+In January 2026, updates were made to fix code bugs and some files that were incorrectly uploaded.
