@@ -41,97 +41,73 @@ class LinearReLU(nn.Module):
 class MHSA(nn.Module):
     def __init__(self, embed_dim=96, num_heads=8):
         super().__init__()
-        self.embed_dim = embed_dim
         self.num_heads = num_heads
         self.d_k = embed_dim // num_heads
-
+        
         self.q_linear = nn.Linear(embed_dim, embed_dim)
         self.k_linear = nn.Linear(embed_dim, embed_dim)
         self.v_linear = nn.Linear(embed_dim, embed_dim)
-
         self.out_linear = nn.Linear(embed_dim, embed_dim)
-
-        self.scale = torch.sqrt(torch.tensor(self.d_k, dtype=torch.float32))
+        self.scale = math.sqrt(self.d_k)
 
     def forward(self, x):
-        L, D = x.shape  # L=512, D=96
-
-        Q = self.q_linear(x)
-        K = self.k_linear(x)
-        V = self.v_linear(x)
-
-        Q = Q.view(L, self.num_heads, self.d_k).transpose(1, 2)
-        K = K.view(L, self.num_heads, self.d_k).transpose(1, 2)
-        V = V.view(L, self.num_heads, self.d_k).transpose(1, 2)
+        B, L, D = x.shape 
+        
+        Q = self.q_linear(x).view(B, L, self.num_heads, self.d_k).transpose(1, 2)
+        K = self.k_linear(x).view(B, L, self.num_heads, self.d_k).transpose(1, 2)
+        V = self.v_linear(x).view(B, L, self.num_heads, self.d_k).transpose(1, 2)
 
         attn_scores = torch.matmul(Q, K.transpose(-2, -1)) / self.scale
         attn_weights = F.softmax(attn_scores, dim=-1)
-        attn_out = torch.matmul(attn_weights, V)
+        attn_out = torch.matmul(attn_weights, V) # [B, num_heads, L, d_k]
 
-        attn_out = attn_out.transpose(1, 2).contiguous().view(L, D)
-
-        final_out = self.out_linear(attn_out)
-
-        return final_out
+        attn_out = attn_out.transpose(1, 2).contiguous().view(B, L, D)
+        return self.out_linear(attn_out)
 
 class StackCNN(nn.Module):
-    def __init__(self, layer_num, in_channels, out_channels, kernel_size, stride=1, padding=0):
+    def __init__(self, layer_num, in_channels, out_channels, kernel_size, stride=1, padding=1):
         super().__init__()
-
-        self.inc = nn.Sequential(OrderedDict([('conv_layer0',
-                                               Conv1dReLU(in_channels, out_channels, kernel_size=kernel_size,
-                                                          stride=stride, padding=padding))]))
-        for layer_idx in range(layer_num - 1):
-            self.inc.add_module('conv_layer%d' % (layer_idx + 1),
-                                Conv1dReLU(out_channels, out_channels, kernel_size=kernel_size, stride=stride,
-                                           padding=padding))
-
-        self.inc.add_module('pool_layer', nn.AdaptiveMaxPool1d(1))
+        layers = []
+        for i in range(layer_num):
+            ic = in_channels if i == 0 else out_channels
+            layers.append(Conv1dReLU(ic, out_channels, kernel_size, stride, padding))
+        self.inc = nn.Sequential(*layers)
 
     def forward(self, x):
-        return self.inc(x).squeeze(-1)
-
-
-class MLP(nn.Module):
-    def __init__(self, in_dim, hidden_dim, out_dim):
-        super().__init__()
-        self.mlp = nn.Sequential(
-            nn.Linear(in_dim, hidden_dim),
-            nn.GELU(),
-            nn.Linear(hidden_dim, out_dim)
-        )
-
-    def forward(self, x):
-        return self.mlp(x)
-
+        return self.inc(x) 
 
 class CTNBlock(nn.Module):
     def __init__(self, block_num, vocab_size, embedding_num):
         super().__init__()
         self.embed = nn.Embedding(vocab_size, embedding_num, padding_idx=0)
-        self.block_list = nn.ModuleList()
-        for block_idx in range(block_num):
-            self.block_list.append(
-                StackCNN(block_idx + 1, embedding_num, 96, 3)
-            )
-
+        self.block_list = nn.ModuleList([
+            StackCNN(i + 1, embedding_num, 96, 3, padding=1) for i in range(block_num)
+        ])
+        
         self.linear = nn.Linear(block_num * 96, 96)
-        self.linear1 = nn.Linear(96, 96)
         self.MHSA = MHSA(96, 8)
         self.MLP = MLP(96, embedding_num, 96)
+        self.pool = nn.AdaptiveMaxPool1d(1)
 
     def forward(self, x):
         x = self.embed(x).permute(0, 2, 1)
+        
         feats = [block(x) for block in self.block_list]
-        layer1 = feats[0]
-        layer2 = feats[1]
-        layer3 = feats[2]
-        x = torch.cat(feats, -1)
-        x = self.linear(x)
-        o1 = self.MHSA(x) + x
-        o2 = self.linear1(o1)
-        o3 = self.MLP(o2) + o1
-        return x, layer1, layer2, layer3
+        
+        combined_seq = torch.cat(feats, dim=1) # [B, 96*3, L]
+        combined_seq = combined_seq.permute(0, 2, 1) # [B, L, 96*3]
+        x_hid = self.linear(combined_seq) # [B, L, 96]
+        
+        o1 = self.MHSA(x_hid) + x_hid      # Residual 1
+        o3 = self.MLP(o1) + o1            # Residual 2
+        
+        layer1 = self.pool(feats[0]).squeeze(-1)
+        layer2 = self.pool(feats[1]).squeeze(-1)
+        layer3 = self.pool(feats[2]).squeeze(-1)
+        
+        final_x = self.pool(o3.permute(0, 2, 1)).squeeze(-1)
+        
+        return final_x, layer1, layer2, layer3
 
 
 class NodeLevelBatchNorm(_BatchNorm):
@@ -194,7 +170,7 @@ class GDC(nn.Module):
         laplacian = torch.eye(adj_t.size(0)).to(x.device) - adj_t
         reg_term = torch.trace(torch.matmul(torch.transpose(x, 0, 1), laplacian))
 
-        x = torch.matmul(adj_t, x) + reg_term
+        data.x = torch.matmul(adj_t, x) + 0.01 * reg_term
 
         return data
 
@@ -341,4 +317,5 @@ class MDCTDTA(nn.Module):
 
         combined_all = torch.cat([protein_combined, ligand_combined], dim=-1)
         return self.classifier(combined_all)
+
 
