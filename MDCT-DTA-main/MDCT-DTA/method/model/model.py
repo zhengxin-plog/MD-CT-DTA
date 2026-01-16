@@ -76,6 +76,20 @@ class StackCNN(nn.Module):
     def forward(self, x):
         return self.inc(x) 
 
+
+class MLP(nn.Module):
+    def __init__(self, in_dim, hidden_dim, out_dim):
+        super().__init__()
+        self.mlp = nn.Sequential(
+            nn.Linear(in_dim, hidden_dim),
+            nn.GELU(),
+            nn.Linear(hidden_dim, out_dim)
+        )
+
+    def forward(self, x):
+        return self.mlp(x)
+
+
 class CTNBlock(nn.Module):
     def __init__(self, block_num, vocab_size, embedding_num):
         super().__init__()
@@ -143,7 +157,6 @@ class NodeLevelBatchNorm(_BatchNorm):
     def extra_repr(self):
         return 'num_features={num_features}, eps={eps}, ' \
                'affine={affine}'.format(**self.__dict__)
-
 
 class GDC(nn.Module):
     def __init__(self, in_channels, hidden_channels, out_channels):
@@ -317,5 +330,4 @@ class MDCTDTA(nn.Module):
 
         combined_all = torch.cat([protein_combined, ligand_combined], dim=-1)
         return self.classifier(combined_all)
-
 
